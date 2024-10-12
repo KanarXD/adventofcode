@@ -15,8 +15,18 @@ fn main() {
     println!("sum={}", sum)
 }
 
-fn process_data(p0: String) -> Vec<u32> {
-    todo!()
+fn process_data(data: String) -> Vec<u32> {
+    data.split("\n").map(|line| {
+        let tokens: Vec<&str> = line.split(" ").collect();
+
+        let id_token = tokens[1];
+        let id = &id_token[0..id_token.len() - 1];
+
+
+        return id;
+    })
+        .map(|number| number.parse::<u32>().expect(format!("{number} is not a number").as_str()))
+        .collect()
 }
 
 
