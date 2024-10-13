@@ -37,12 +37,6 @@ fn process_data(data: String) -> Vec<u32> {
                 digits.push(char);
             }
             match (char_is_numeric, last_char_digit, confirmed) {
-                (true, false, true) => {
-                    panic!("something is wrong");
-                }
-                (false, false, true) => {
-                    panic!("something is wrong");
-                }
                 (true, true, false) => {
                     if check_up_and_down(&matrix, y, x) {
                         confirmed = true
