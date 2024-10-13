@@ -14,8 +14,8 @@ fn main() {
     println!("{}", data);
 
 
-    let numbers = process_data(data);
-    let sum = numbers.iter().sum::<u32>();
+    let numbers: Vec<u32> = process_data(data);
+    let sum: u32 = numbers.iter().sum();
 
     println!("{:?}", numbers);
     println!("sum={}", sum);
