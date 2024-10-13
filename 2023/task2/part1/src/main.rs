@@ -26,9 +26,11 @@ struct CubeMove {
     color: Color,
 }
 
+const GAME_CONSTRAINTS: GameTurn = GameTurn { red: 12, green: 13, blue: 14 };
+
 fn main() {
-    let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    // let file_path = "res/demo_input.txt";
+    let file_path = "res/input.txt";
 
     let data: String = fs::read_to_string(file_path)
         .expect(format!("failed to read file: {file_path}").as_str());
@@ -42,14 +44,31 @@ fn main() {
 }
 
 fn process_data(data: String) -> Vec<u32> {
-    let games: Vec<Game> = data.split("\n").map(|line| {
-        let mut parts = line.split(": ");
-        let first_part = parts.next()
-            .expect("line has to have first part");
-        let second_part = parts.next()
-            .expect("line has to have second part");
-        return (first_part, second_part);
-    })
+    let games = parse_games(data);
+    println!("{:?}", games);
+
+    let filtered_games: Vec<u32> = games.iter()
+        .filter(|game| {
+            game.max_red <= GAME_CONSTRAINTS.red
+                && game.max_green <= GAME_CONSTRAINTS.green
+                && game.max_blue <= GAME_CONSTRAINTS.blue
+        })
+        .map(|game| game.id)
+        .collect();
+
+    filtered_games
+}
+
+fn parse_games(data: String) -> Vec<Game> {
+    let games: Vec<Game> = data.split("\n")
+        .map(|line| {
+            let mut parts = line.split(": ");
+            let first_part = parts.next()
+                .expect("line has to have first part");
+            let second_part = parts.next()
+                .expect("line has to have second part");
+            return (first_part, second_part);
+        })
         .map(|(first_part, second_part)| {
             let id: u32 = first_part.split(' ')
                 .nth(1)
@@ -59,10 +78,7 @@ fn process_data(data: String) -> Vec<u32> {
             parse_game(id, second_part)
         })
         .collect();
-
-    println!("{:?}", games);
-
-    Vec::new()
+    games
 }
 
 fn parse_game(id: u32, games_string: &str) -> Game {
