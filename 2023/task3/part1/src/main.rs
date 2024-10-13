@@ -27,10 +27,7 @@ fn main() {
 
 fn process_data(data: String) -> Vec<u32> {
     let matrix = parse_matrix(data);
-    println!("lines={:?}", matrix);
-    // let (height, width) = calculate_dimensions(&matrix);
-    // println!("height={}, width={}", height, width);
-
+    // println!("matrix={:?}", matrix);
 
     let mut confirmed_numbers: Vec<u32> = vec![];
     for y in 0..matrix.height {
@@ -46,33 +43,52 @@ fn process_data(data: String) -> Vec<u32> {
                 digits.push(char);
             }
 
-            match (char_is_numeric, confirmed, last_char_digit) {
-                (true, true, true) => {
-                    let number = chars_to_number(&digits);
-                    confirmed_numbers.push(number);
-                    confirmed = false;
-                    last_char_digit = false;
+            match (char_is_numeric, last_char_digit, confirmed) {
+                (true, false, true) => {
+                    panic!("something is wrong");
                 }
-                (true, true, false) => {}
-                (true, false, true) => {}
+                (false, false, true) => {
+                    panic!("something is wrong");
+                }
+                (true, true, false) => {
+                    if check_up_and_down(&matrix, y, x) {
+                        confirmed = true
+                    }
+                }
                 (true, false, false) => {
                     if check_up_and_down(&matrix, y, x) ||
                         check_up_and_down(&matrix, y, x - 1) {
                         confirmed = true
                     }
                 }
+                (false, true, true) => {
+                    let number = chars_to_number(&digits);
+                    confirmed_numbers.push(number);
+                    digits.clear();
+                    confirmed = false;
+                }
+                (false, true, false) => {
+                    if check_up_and_down(&matrix, y, x) || check_point(&matrix, y, x) {
+                        let number = chars_to_number(&digits);
+                        confirmed_numbers.push(number);
+                    }
+                    digits.clear();
+                }
                 _ => {}
             }
-
             last_char_digit = char_is_numeric;
+        }
+        if confirmed {
+            let number = chars_to_number(&digits);
+            confirmed_numbers.push(number);
         }
     }
 
-    Vec::new()
+    confirmed_numbers
 }
 
 fn check_up_and_down(matrix: &Matrix, y: i32, x: i32) -> bool {
-    check_point(matrix, y - 1, x) &&
+    check_point(matrix, y - 1, x) ||
         check_point(matrix, y + 1, x)
 }
 
@@ -90,7 +106,7 @@ fn check_point(matrix: &Matrix, y: i32, x: i32) -> bool {
 fn chars_to_number(digits: &Vec<char>) -> u32 {
     digits.iter()
         .collect::<String>()
-        .parse()
+        .parse::<u32>()
         .expect(format!("{:?} are not a number", digits).as_str())
 }
 
