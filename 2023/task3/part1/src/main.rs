@@ -5,14 +5,10 @@ use std::fs;
 use std::ops::{Index, IndexMut};
 
 const NOT_CONFIRMATION_SYMBOLS: &str = "0123456789.";
-struct Point {
-    x: u32,
-    y: u32,
-}
 
 fn main() {
-    let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    // let file_path = "res/demo_input.txt";
+    let file_path = "res/input.txt";
 
     let data: String = fs::read_to_string(file_path)
         .expect(format!("failed to read file: {file_path}").as_str());
@@ -27,8 +23,6 @@ fn main() {
 
 fn process_data(data: String) -> Vec<u32> {
     let matrix = parse_matrix(data);
-    // println!("matrix={:?}", matrix);
-
     let mut confirmed_numbers: Vec<u32> = vec![];
     for y in 0..matrix.height {
         let mut digits: Vec<char> = vec![];
@@ -42,7 +36,6 @@ fn process_data(data: String) -> Vec<u32> {
             if char_is_numeric {
                 digits.push(char);
             }
-
             match (char_is_numeric, last_char_digit, confirmed) {
                 (true, false, true) => {
                     panic!("something is wrong");
@@ -57,7 +50,9 @@ fn process_data(data: String) -> Vec<u32> {
                 }
                 (true, false, false) => {
                     if check_up_and_down(&matrix, y, x) ||
-                        check_up_and_down(&matrix, y, x - 1) {
+                        check_up_and_down(&matrix, y, x - 1) ||
+                        check_point(&matrix, y, x - 1,
+                        ) {
                         confirmed = true
                     }
                 }
@@ -83,7 +78,6 @@ fn process_data(data: String) -> Vec<u32> {
             confirmed_numbers.push(number);
         }
     }
-
     confirmed_numbers
 }
 
