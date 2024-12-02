@@ -72,20 +72,17 @@ fn verify_numbers(direction: Direction, previous_number: u32, next_number: u32) 
             if next_number <= previous_number {
                 return false;
             }
-            match previous_number.abs_diff(next_number) {
-                MIN_INCREMENT..=MAX_INCREMENT => true,
-                _ => false,
-            }
         }
         Decrement => {
             if next_number >= previous_number {
                 return false;
             }
-            match previous_number.abs_diff(next_number) {
-                MIN_INCREMENT..=MAX_INCREMENT => true,
-                _ => false,
-            }
         }
+    }
+    let increment = previous_number.abs_diff(next_number);
+    match increment {
+        MIN_INCREMENT..=MAX_INCREMENT => true,
+        _ => false,
     }
 }
 
