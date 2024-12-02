@@ -46,24 +46,46 @@ fn process_data(reports: Vec<Vec<u32>>) -> u32 {
 }
 
 fn verify_report(report: &Vec<u32>) -> bool {
-    let mut good = verify_report_direction(&report, Increment, true);
-    if good {
-        return true;
+    for i in 0..report.len() {
+        let left = &report[..i];
+        let right = &report[i + 1..];
+        let iterator = left.iter().chain(right.iter());
+
+        let mut good = verify_report_direction(iterator.clone(), Increment);
+        if good {
+            return true;
+        }
+        let mut good = verify_report_direction(iterator, Decrement);
+        if good {
+            return true;
+        }
     }
-    let mut good = verify_report_direction(&report, Decrement, true);
-    if good {
-        return true;
+
+    false
+}
+
+fn verify_report_direction<'a>(
+    report: impl Iterator<Item = &'a u32>,
+    direction: Direction,
+) -> bool {
+    let mut previous_number_needs_set = true;
+    let mut previous_number = 0;
+    let report = report.collect::<Vec<_>>();
+    println!("checking={:?}, in {:?}", report, direction);
+
+    for &next_number in report {
+        if previous_number_needs_set {
+            previous_number_needs_set = false;
+            previous_number = next_number;
+            continue;
+        }
+        if verify_numbers(direction, previous_number, next_number) {
+            previous_number = next_number;
+        } else {
+            return false;
+        }
     }
-    let report_skip_one = &report.iter().skip(1).copied().collect();
-    let mut good = verify_report_direction(&report_skip_one, Increment, false);
-    if good {
-        return true;
-    }
-    let mut good = verify_report_direction(&report_skip_one, Decrement, false);
-    if good {
-        return true;
-    }
-    return false;
+    true
 }
 
 fn verify_numbers(direction: Direction, previous_number: u32, next_number: u32) -> bool {
@@ -84,24 +106,6 @@ fn verify_numbers(direction: Direction, previous_number: u32, next_number: u32) 
         MIN_INCREMENT..=MAX_INCREMENT => true,
         _ => false,
     }
-}
-
-fn verify_report_direction(report: &Vec<u32>, direction: Direction, mut can_skip: bool) -> bool {
-    // let mut can_skip = true;
-    let mut previous_number = report[0];
-
-    for &next_number in report.iter().skip(1) {
-        if verify_numbers(direction, previous_number, next_number) {
-            previous_number = next_number;
-        } else {
-            if can_skip {
-                can_skip = false;
-            } else {
-                return false;
-            }
-        }
-    }
-    true
 }
 
 fn parse_numbers(data: String) -> Vec<Vec<u32>> {
