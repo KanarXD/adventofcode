@@ -1,6 +1,6 @@
 use std::fs;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct Guard {
     direction: Direction,
     x: usize,
