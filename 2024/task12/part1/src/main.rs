@@ -10,7 +10,7 @@ struct Position {
 
 fn main() {
     let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    let file_path = "res/input.txt";
 
     let data: String =
         fs::read_to_string(file_path).expect(format!("failed to read file: {file_path}").as_str());
@@ -48,23 +48,29 @@ fn process_data(locations: &Vec<Vec<char>>, letters: &HashSet<char>) -> u64 {
     let height = locations.len();
     for &letter in letters {
         let mut checked_regions: HashSet<Position> = HashSet::new();
-        let mut borders = 0;
         for y in 0..height {
             for x in 0..width {
-                if locations[y][x] != letter {
-                    continue;
-                }
+                let checked_letter = locations[y][x];
                 let position = Position {
                     x: x as isize,
                     y: y as isize,
                 };
-                borders += check_region(locations, letter, &mut checked_regions, position);
+                if checked_letter != letter || checked_regions.contains(&position) {
+                    continue;
+                }
+                let mut checked_regions_single: HashSet<Position> = HashSet::new();
+
+                let borders =
+                    check_region(locations, letter, &mut checked_regions_single, position);
+
+                let area = checked_regions_single.len() as u64;
+                let price = borders * area;
+                println!("letter={letter}, borders={borders}, area={area}, price={price}");
+
+                sum += price;
+                checked_regions.extend(checked_regions_single);
             }
         }
-        let area = checked_regions.len() as u64;
-        let price = borders * area;
-        println!("letter={letter}, borders={borders}, area={area}, price={price}");
-        sum += price;
     }
     sum
 }
@@ -124,5 +130,5 @@ fn check_region(
         );
         return sum;
     }
-    return 0;
+    return 1;
 }
