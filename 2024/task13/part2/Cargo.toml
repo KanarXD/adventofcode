@@ -1,0 +1,9 @@
+[package]
+name = "part1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+regex = "1.11.1"
+diagonal = "0.1.0"
+good_lp = { version = "1.10.0", features = ["lpsolve"], default-features = false }
