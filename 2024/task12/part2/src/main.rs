@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 struct Position {
@@ -27,44 +27,11 @@ impl Position {
     }
 }
 
-// #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 struct Edge {
-    start: Position,
-    end: Position,
-}
-
-// impl Edge {
-//     fn on_the_same_edge(&self, edge: Edge) -> bool {
-//         (self.start.x_coordinate_equals(edge.start) && self.end.x_coordinate_equals(edge.end)) ||
-//         (self.start.y_coordinate_equals(edge.start) && self.end.y_coordinate_equals(edge.end))
-//     }
-// }
-
-impl PartialEq<Self> for Edge {
-    fn eq(&self, edge: &Self) -> bool {
-        (
-            self.start.x_coordinate_equals(&edge.start) && self.end.x_coordinate_equals(&edge.end)
-            // && self.start.y_difference(&edge.start) == self.end.y_difference(&edge.end)
-        ) || (
-            self.start.y_coordinate_equals(&edge.start) && self.end.y_coordinate_equals(&edge.end)
-            // && self.start.x_difference(&edge.start) == self.end.x_difference(&edge.end)
-        )
-    }
-}
-
-impl Eq for Edge {}
-
-impl Hash for Edge {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        if self.start.x_coordinate_equals(&self.end) {
-            self.start.y.hash(state);
-        } else if self.start.y_coordinate_equals(&self.end) {
-            self.start.x.hash(state);
-        } else {
-            panic!("bad edge");
-        }
-    }
+    vertical: bool,
+    start: isize,
+    end: isize,
 }
 
 fn main() {
@@ -131,7 +98,10 @@ fn process_data(locations: &Vec<Vec<char>>, letters: &HashSet<char>) -> u64 {
                     &position,
                     position.clone(),
                 );
-                let borders: u64 = checked_edges.len() as u64;
+                let mut borders: u64 = checked_edges
+                    .iter()
+                    .map(|edge| bonus_borders(locations, letter, edge))
+                    .sum::<u64>();
 
                 let area = checked_regions_single.len() as u64;
                 let price = borders * area;
@@ -144,6 +114,59 @@ fn process_data(locations: &Vec<Vec<char>>, letters: &HashSet<char>) -> u64 {
         }
     }
     sum
+}
+
+fn bonus_borders(locations: &Vec<Vec<char>>, letter: char, edge: &Edge) -> u64 {
+    let mut count = 0;
+    let width = locations[0].len();
+    let height = locations.len();
+    let mut last_letter = false;
+    if edge.vertical {
+        for x in 0..width {
+            let checked_letter = locations[edge.start as usize][x];
+            if checked_letter != letter {
+                last_letter = false;
+                continue;
+            }
+            let position = Position {
+                y: edge.end,
+                x: x as isize,
+            };
+            if let Some(end_letter) = check_location(locations, &position) {
+                if end_letter == letter {
+                    last_letter = false;
+                    continue;
+                }
+            }
+            if !last_letter {
+                count += 1;
+            }
+            last_letter = true;
+        }
+    } else {
+        for y in 0..height {
+            let checked_letter = locations[y][edge.start as usize];
+            if checked_letter != letter {
+                last_letter = false;
+                continue;
+            }
+            let position = Position {
+                y: y as isize,
+                x: edge.end,
+            };
+            // if let Some(end_letter) = check_location(locations, &position) {
+            //     if end_letter == letter {
+            //         last_letter = false;
+            //         continue;
+            //     }
+            // }
+            if !last_letter {
+                count += 1;
+            }
+            last_letter = true;
+        }
+    }
+    count
 }
 
 fn check_region(
@@ -160,11 +183,22 @@ fn check_region(
             return;
         }
         if region_letter != letter {
-            let edge = Edge {
-                start: previous_position.clone(),
-                end: position,
-            };
-            checked_edges.insert(edge);
+            if previous_position.y_coordinate_equals(&position) {
+                let edge = Edge {
+                    vertical: false,
+                    start: previous_position.x,
+                    end: position.x,
+                };
+                checked_edges.insert(edge);
+            } else if previous_position.x_coordinate_equals(&position) {
+                let edge = Edge {
+                    vertical: true,
+                    start: previous_position.y,
+                    end: position.y,
+                };
+                checked_edges.insert(edge);
+            }
+
             return;
         }
 
@@ -217,9 +251,19 @@ fn check_region(
         return;
     }
 
-    let edge = Edge {
-        start: previous_position.clone(),
-        end: position,
-    };
-    checked_edges.insert(edge);
+    if previous_position.y_coordinate_equals(&position) {
+        let edge = Edge {
+            vertical: false,
+            start: previous_position.x,
+            end: position.x,
+        };
+        checked_edges.insert(edge);
+    } else if previous_position.x_coordinate_equals(&position) {
+        let edge = Edge {
+            vertical: true,
+            start: previous_position.y,
+            end: position.y,
+        };
+        checked_edges.insert(edge);
+    }
 }
