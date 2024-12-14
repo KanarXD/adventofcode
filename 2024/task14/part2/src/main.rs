@@ -9,9 +9,9 @@ const HEIGHT: isize = 103;
 const MIDDLE_X: isize = WIDTH / 2;
 const MIDDLE_Y: isize = HEIGHT / 2;
 
-const ITERATIONS: usize = 10 * 103 * 101;
+const ITERATIONS: usize = 101 * 103;
 
-const MIN_LINE: u64 = 3;
+const MIN_LINE: u64 = 10;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 struct Position {
@@ -91,8 +91,7 @@ fn verify_value(value: isize, max: isize) -> isize {
 fn process_data(robots: &Vec<Robot>) -> u64 {
     let mut work_robots = robots.clone();
 
-    for i in 0..ITERATIONS {
-        // println!("iteration={}", i);
+    for i in 1..ITERATIONS {
         let mut result = generate_empty_matrix();
         for robot in work_robots.iter_mut() {
             robot.position = robot.position + robot.velocity;
@@ -106,9 +105,6 @@ fn process_data(robots: &Vec<Robot>) -> u64 {
         }
     }
 
-    // println!("result={:?}", result);
-
-    // calculate_result_sum(&result)
     0
 }
 
@@ -116,7 +112,7 @@ fn find_line(matrix: &Vec<Vec<u64>>) -> bool {
     for y in 0..HEIGHT as usize {
         let mut line_length: u64 = 0;
         for x in 0..WIDTH as usize {
-            if matrix[y][x] > 1 {
+            if matrix[y][x] > 0 {
                 line_length += 1;
                 if line_length > MIN_LINE {
                     return true;
@@ -129,7 +125,7 @@ fn find_line(matrix: &Vec<Vec<u64>>) -> bool {
     for x in 0..WIDTH as usize {
         let mut line_length = 0;
         for y in 0..HEIGHT as usize {
-            if matrix[y][x] > 1 {
+            if matrix[y][x] > 0 {
                 line_length += 1;
                 if line_length > MIN_LINE {
                     return true;
