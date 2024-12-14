@@ -30,13 +30,13 @@ impl Position {
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 struct Edge {
     vertical: bool,
-    start: isize,
-    end: isize,
+    start: Position,
+    end: Position,
 }
 
 fn main() {
     let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    let file_path = "res/input.txt";
 
     let data: String =
         fs::read_to_string(file_path).expect(format!("failed to read file: {file_path}").as_str());
@@ -73,7 +73,7 @@ fn process_data(locations: &Vec<Vec<char>>, letters: &HashSet<char>) -> u64 {
     let width = locations[0].len();
     let height = locations.len();
     for &letter in letters {
-        // if letter != 'C' {
+        // if letter != 'E' {
         //     continue;
         // }
         let mut checked_regions: HashSet<Position> = HashSet::new();
@@ -98,10 +98,11 @@ fn process_data(locations: &Vec<Vec<char>>, letters: &HashSet<char>) -> u64 {
                     &position,
                     position.clone(),
                 );
-                let mut borders: u64 = checked_edges
-                    .iter()
-                    .map(|edge| bonus_borders(locations, letter, edge))
-                    .sum::<u64>();
+                // let mut borders: u64 = checked_edges
+                //     .iter()
+                //     .map(|edge| bonus_borders(locations, letter, edge))
+                //     .sum::<u64>();
+                let mut borders: u64 = checked_edges.len() as u64;
 
                 let area = checked_regions_single.len() as u64;
                 let price = borders * area;
@@ -116,57 +117,60 @@ fn process_data(locations: &Vec<Vec<char>>, letters: &HashSet<char>) -> u64 {
     sum
 }
 
-fn bonus_borders(locations: &Vec<Vec<char>>, letter: char, edge: &Edge) -> u64 {
-    let mut count = 0;
-    let width = locations[0].len();
-    let height = locations.len();
-    let mut last_letter = false;
+fn insert_edge(
+    locations: &Vec<Vec<char>>,
+    letter: char,
+    mut checked_edges: &mut HashSet<Edge>,
+    position: &Position,
+    mut edge: Edge,
+) {
+    let width = locations[0].len() as isize;
+    let height = locations.len() as isize;
     if edge.vertical {
-        for x in 0..width {
-            let checked_letter = locations[edge.start as usize][x];
-            if checked_letter != letter {
-                last_letter = false;
-                continue;
-            }
-            let position = Position {
-                y: edge.end,
-                x: x as isize,
-            };
-            if let Some(end_letter) = check_location(locations, &position) {
-                if end_letter == letter {
-                    last_letter = false;
-                    continue;
+        for x in position.x + 1..=width {
+            edge.start.x = x - 1;
+            edge.end.x = x - 1;
+            // let checked_letter = locations[edge.start.y as usize][x as usize];
+            if let Some(checked_letter) =
+                check_location(locations, &Position { y: edge.start.y, x })
+            {
+                if checked_letter == letter {
+                    if let Some(end_letter) =
+                        check_location(locations, &Position { y: edge.end.y, x })
+                    {
+                        if end_letter == letter {
+                            break;
+                        }
+                    }
+                } else {
+                    break;
                 }
             }
-            if !last_letter {
-                count += 1;
-            }
-            last_letter = true;
         }
     } else {
-        for y in 0..height {
-            let checked_letter = locations[y][edge.start as usize];
-            if checked_letter != letter {
-                last_letter = false;
-                continue;
+        for y in position.y + 1..=height {
+            // let checked_letter = locations[y as usize][edge.start.x as usize];
+            edge.start.y = y - 1;
+            edge.end.y = y - 1;
+            if let Some(checked_letter) =
+                check_location(locations, &Position { y, x: edge.start.x })
+            {
+                if checked_letter == letter {
+                    if let Some(end_letter) =
+                        check_location(locations, &Position { y, x: edge.end.x })
+                    {
+                        if end_letter == letter {
+                            break;
+                        }
+                    }
+                } else {
+                    break;
+                }
             }
-            let position = Position {
-                y: y as isize,
-                x: edge.end,
-            };
-            // if let Some(end_letter) = check_location(locations, &position) {
-            //     if end_letter == letter {
-            //         last_letter = false;
-            //         continue;
-            //     }
-            // }
-            if !last_letter {
-                count += 1;
-            }
-            last_letter = true;
         }
     }
-    count
+    checked_edges.insert(edge);
+    // panic!("failed to insert edge");
 }
 
 fn check_region(
@@ -183,22 +187,8 @@ fn check_region(
             return;
         }
         if region_letter != letter {
-            if previous_position.y_coordinate_equals(&position) {
-                let edge = Edge {
-                    vertical: false,
-                    start: previous_position.x,
-                    end: position.x,
-                };
-                checked_edges.insert(edge);
-            } else if previous_position.x_coordinate_equals(&position) {
-                let edge = Edge {
-                    vertical: true,
-                    start: previous_position.y,
-                    end: position.y,
-                };
-                checked_edges.insert(edge);
-            }
-
+            let edge = create_edge(previous_position, &position);
+            insert_edge(locations, letter, checked_edges, &position, edge);
             return;
         }
 
@@ -248,22 +238,27 @@ fn check_region(
                 y: position.y + 1,
             },
         );
-        return;
+    } else {
+        let edge = create_edge(previous_position, &position);
+        insert_edge(locations, letter, checked_edges, &position, edge);
     }
+}
 
+fn create_edge(previous_position: &Position, position: &Position) -> Edge {
     if previous_position.y_coordinate_equals(&position) {
         let edge = Edge {
             vertical: false,
-            start: previous_position.x,
-            end: position.x,
+            start: *previous_position,
+            end: *position,
         };
-        checked_edges.insert(edge);
+        return edge;
     } else if previous_position.x_coordinate_equals(&position) {
         let edge = Edge {
             vertical: true,
-            start: previous_position.y,
-            end: position.y,
+            start: *previous_position,
+            end: *position,
         };
-        checked_edges.insert(edge);
+        return edge;
     }
+    panic!("Something went wrong");
 }
