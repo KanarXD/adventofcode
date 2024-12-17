@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, LinkedList};
 use std::fmt::Debug;
 use std::fs;
 
@@ -30,6 +30,14 @@ struct DirectedPosition {
     direction: Direction,
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+enum Result {
+    Visited,
+    DeadEnd,
+    Wall,
+    Way(u64, LinkedList<Position>),
+}
+
 fn main() {
     let file_path = "res/demo_input.txt";
     let file_path = "res/input.txt";
@@ -47,96 +55,123 @@ fn main() {
 }
 
 fn process_data(matrix: &Vec<Vec<Tile>>) -> u64 {
-    let mut visited = HashSet::new();
+    let mut visited = LinkedList::new();
     let mut cache = HashMap::new();
     let start_position = find_start_position(matrix);
-    let (score, path) = search(
+    if let Result::Way(score, path) = search(
         matrix,
         &mut visited,
         &start_position,
         &Direction::Right,
         &mut cache,
-    )
-    .unwrap();
-    let cache_key = (
-        DirectedPosition {
-            position: start_position,
-            direction: Direction::Right,
-        },
-        Position {
-            x: start_position.x + 1,
-            y: start_position.y,
-        },
-    );
-    // let x = cache.get(&cache_key).unwrap();
-    // println!("Cache: {x:?}");
+    ) {
+        print_matrix(&matrix, &path);
 
-    print_matrix(&matrix, &path);
-
-    score
+        return score;
+    }
+    panic!("no way found");
 }
 
 fn search(
     matrix: &Vec<Vec<Tile>>,
-    mut visited: &mut HashSet<Position>,
+    mut visited: &mut LinkedList<Position>,
     position: &Position,
     direction: &Direction,
-    mut cache: &mut HashMap<(DirectedPosition, Position), Option<(u64, Vec<Position>)>>,
-) -> Option<(u64, Vec<Position>)> {
+    mut cache: &mut HashMap<(DirectedPosition, Position), Result>,
+) -> Result {
     if let Some(tile) = get_tile(matrix, &position) {
         if tile == Tile::End {
-            return Some((0, vec![*position]));
+            println!("found end");
+            return Result::Way(0, LinkedList::new());
         }
-        if ![Tile::Empty, Tile::Start].contains(&tile)
-        // || visited.contains(&position)
-        {
-            return None;
+        if tile == Tile::Wall {
+            return Result::Wall;
         }
-        visited.insert(position.clone());
+        if visited.contains(&position) {
+            return Result::Visited;
+        }
+
+        visited.push_back(position.clone());
+        // visited.insert(position.clone());
 
         let directed_position = DirectedPosition {
             direction: direction.clone(),
             position: position.clone(),
         };
 
-        let best_score: Option<(u64, Vec<Position>)> = [
-            Direction::Up,
+        let neighbours: Vec<Result> = [
             Direction::Down,
             Direction::Right,
             Direction::Left,
+            Direction::Up,
         ]
-        .map(|d| {
-            let checked_position = direction_position(d, position);
-            if visited.contains(&checked_position) {
-                return None;
-            }
+        .into_iter()
+        .filter(|checked_direction| direction_score_add(direction, checked_direction) != 2000)
+        .map(|checked_direction| {
+            let checked_position = direction_position(checked_direction, position);
             let cache_key = (directed_position, checked_position);
             if let Some(cache_value) = cache.get(&cache_key) {
                 return cache_value.clone();
             }
-            let score = search(matrix, &mut visited, &checked_position, &d, &mut cache);
-            if let Some((score, result_positions)) = score {
-                let add_score = direction_score_add(direction, &d);
-                let final_score = score + add_score;
-                cache.insert(cache_key, Some((final_score, result_positions.clone())));
-                return Some((final_score, result_positions));
-            } else {
-                cache.insert(cache_key, None);
-            }
-            None
+            let score = search(
+                matrix,
+                &mut visited,
+                &checked_position,
+                &checked_direction,
+                &mut cache,
+            );
+
+            return match score {
+                Result::Visited => Result::Visited,
+                Result::Wall => {
+                    cache.insert(cache_key, Result::Wall);
+                    Result::Wall
+                }
+                Result::DeadEnd => {
+                    cache.insert(cache_key, Result::DeadEnd);
+                    Result::DeadEnd
+                }
+                Result::Way(score, result_positions) => {
+                    let add_score = direction_score_add(direction, &checked_direction);
+                    let final_score = score + add_score;
+                    let result = Result::Way(final_score, result_positions.clone());
+                    cache.insert(cache_key, result.clone());
+                    result
+                }
+            };
         })
         .into_iter()
-        .flatten()
-        .min_by(|(s1, p1), (s2, p2)| s1.cmp(&s2));
+        .collect();
 
-        visited.remove(&position);
+        let mut is_not_dead_end = false;
+
+        let best_score = neighbours
+            .into_iter()
+            .map(|result| match result {
+                Result::DeadEnd => None,
+                Result::Visited => {
+                    is_not_dead_end = true;
+                    None
+                }
+                Result::Wall => None,
+                Result::Way(score, path) => Some((score, path)),
+            })
+            .flatten()
+            .min_by(|(s1, p1), (s2, p2)| s1.cmp(&s2));
+
+        visited.pop_back();
 
         if let Some((score, mut result_positions)) = best_score {
-            result_positions.push(*position);
-            return Some((score + 1, result_positions));
+            result_positions.push_back(*position);
+            return Result::Way(score + 1, result_positions);
+        } else if is_not_dead_end {
+            return Result::Visited;
+        } else {
+            return Result::DeadEnd;
         }
+    } else {
+        return Result::Wall;
     }
-    None
 }
 
 fn direction_score_add(current_direction: &Direction, new_direction: &Direction) -> u64 {
@@ -226,7 +261,7 @@ fn parse_lines(data: String) -> Vec<Vec<Tile>> {
         .collect()
 }
 
-fn print_matrix(matrix: &Vec<Vec<Tile>>, path: &Vec<Position>) {
+fn print_matrix(matrix: &Vec<Vec<Tile>>, path: &LinkedList<Position>) {
     let height = matrix.len();
     let width = matrix[0].len();
 
