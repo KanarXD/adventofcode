@@ -13,18 +13,18 @@ fun main() {
     val data = object {}.javaClass.getResource(file_path).readText()
     println(data)
 
-    val input: Array<Array<Cell>> = parse_lines(data)
+    val input: Array<Array<Cell>> = parseLines(data)
     printMatrix(input)
 
-    val output: Int = process_data(input)
+    val output: Int = processData(input)
     println("Output: $output")
 }
 
-fun process_data(matrix: Array<Array<Cell>>): Int {
+fun processData(matrix: Array<Array<Cell>>): Int {
     TODO()
 }
 
-fun parse_lines(data: String): Array<Array<Cell>> {
+fun parseLines(data: String): Array<Array<Cell>> {
     val matrix = Array(SIZE) { Array(SIZE) { Cell.EMPTY } }
 
     data.split('\n')
