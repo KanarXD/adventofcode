@@ -3,7 +3,6 @@ package part2
 import java.util.*
 
 const val SIZE = 71
-const val BYTE_COUNT = 1024
 
 enum class Cell {
     EMPTY,
@@ -12,26 +11,34 @@ enum class Cell {
 
 data class Point(val x: Int, val y: Int)
 
+class PathNotFoundException(message: String) : Exception(message)
+
 fun main() {
 //    val file_path = "demo_input.txt"
     val file_path = "input.txt"
 
-
     val data = Thread.currentThread().contextClassLoader.getResource(file_path)!!.readText()
     println(data)
 
-    val input: Array<Array<Cell>> = parseLines(data)
-    printMatrix(input)
+    val (matrix, bytes) = parseLines(data)
+    printMatrix(matrix, bytes)
 
-    val output: Int = processData(input)
-    println("Output: $output")
+    val output: Int = processData(matrix, bytes)
+    println("Output: $output, point: ${bytes[output]}")
 }
 
-fun processData(matrix: Array<Array<Cell>>): Int {
-    val graph: Map<Point, List<Point>> = createGraph(matrix)
-    val path = bfs(graph)
-    printMatrix(matrix, path)
-    return path.size - 1
+fun processData(matrix: Array<Array<Cell>>, bytes: List<Point>): Int {
+    for ((i, byte) in bytes.withIndex()) {
+        matrix[byte.y][byte.x] = Cell.WALL
+        try {
+            val graph: Map<Point, List<Point>> = createGraph(matrix)
+            val path = bfs(graph)
+//            printMatrix(matrix, path)
+        } catch (e: PathNotFoundException) {
+            return i
+        }
+    }
+    throw Exception("path is always found")
 }
 
 fun bfs(graph: Map<Point, List<Point>>): List<Point> {
@@ -58,7 +65,7 @@ fun bfs(graph: Map<Point, List<Point>>): List<Point> {
             toVisit.add(path + neighbour)
         }
     }
-    throw Exception("path not found")
+    throw PathNotFoundException("path not found")
 }
 
 fun createGraph(matrix: Array<Array<Cell>>): Map<Point, List<Point>> {
@@ -88,16 +95,15 @@ private fun addPointIfPossible(x: Int, y: Int, matrix: Array<Array<Cell>>, neigh
     neighbours.add(checkedPoint)
 }
 
-fun parseLines(data: String): Array<Array<Cell>> {
+fun parseLines(data: String): Pair<Array<Array<Cell>>, List<Point>> {
     val matrix = Array(SIZE) { Array(SIZE) { Cell.EMPTY } }
-
-    data.split('\n')
-        .take(BYTE_COUNT)
-        .forEach { line ->
+    val bytes = data.split('\n')
+        .map { line ->
             val (x, y) = line.split(',').map { it.toInt() }
-            matrix[y][x] = Cell.WALL
-        }
-    return matrix
+            Point(x, y)
+        }.toCollection(LinkedList<Point>())
+
+    return (matrix to bytes)
 }
 
 fun printMatrix(matrix: Array<Array<Cell>>, path: List<Point> = emptyList()) {
