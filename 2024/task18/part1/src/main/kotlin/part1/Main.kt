@@ -1,3 +1,5 @@
+package part1
+
 import java.util.*
 
 const val SIZE = 71
@@ -14,7 +16,7 @@ fun main() {
 //    val file_path = "demo_input.txt"
     val file_path = "input.txt"
 
-    val data = object {}.javaClass.getResource(file_path)!!.readText()
+    val data = Thread.currentThread().contextClassLoader.getResource(file_path)!!.readText()
     println(data)
 
     val input: Array<Array<Cell>> = parseLines(data)
