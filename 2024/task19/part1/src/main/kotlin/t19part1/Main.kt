@@ -1,10 +1,8 @@
 package t19part1
 
-// 275
-
 fun main() {
-    val file_path = "demo_input.txt"
-//    val file_path = "input.txt"
+//    val file_path = "demo_input.txt"
+    val file_path = "input.txt"
 
     val data = Thread.currentThread().contextClassLoader.getResource(file_path)!!.readText()
     println(data)
@@ -23,25 +21,27 @@ fun processData(patterns: List<String>, towels: List<String>): Int {
     for (towel in towels) {
         if (isTowelPossible(patterns, towel)) {
             sum++
-//            println("towel: $towel possible")
+            println("towel: $towel possible")
         } else {
-//            println("towel: $towel not possible")
+            println("towel: $towel not possible")
         }
     }
     return sum
 }
 
 fun isTowelPossible(patterns: List<String>, towel: String): Boolean {
-    var position = 0
-    while (position < towel.length) {
-        val positionMove = findPattern(patterns, towel.substring(position))
-        if (positionMove > 0) {
-            position += positionMove
-        } else {
-            return false
+    if (towel.isEmpty()) {
+        return true
+    }
+    for (pattern in patterns) {
+        if (towel.indexOf(pattern) == 0) {
+            val newTowel = towel.substring(pattern.length)
+            if (isTowelPossible(patterns, newTowel)) {
+                return true
+            }
         }
     }
-    return true
+    return false
 }
 
 private fun findPattern(
