@@ -1,17 +1,6 @@
 package t19part2
 
-import java.util.*
-
-const val SIZE = 71
-
-enum class Cell {
-    EMPTY,
-    WALL,
-}
-
-data class Point(val x: Int, val y: Int)
-
-class PathNotFoundException(message: String) : Exception(message)
+// 32140598
 
 fun main() {
 //    val file_path = "demo_input.txt"
@@ -20,104 +9,52 @@ fun main() {
     val data = Thread.currentThread().contextClassLoader.getResource(file_path)!!.readText()
     println(data)
 
-    val (matrix, bytes) = parseLines(data)
-    printMatrix(matrix, bytes)
+    val (patterns, towels) = parseLines(data)
+    println("patterns: $patterns")
+    println("towels: $towels")
 
-    val output: Int = processData(matrix, bytes)
-    println("Output: $output, point: ${bytes[output]}")
+    val output: Int = processData(patterns, towels)
+    println("Output: $output")
 }
 
-fun processData(matrix: Array<Array<Cell>>, bytes: List<Point>): Int {
-    for ((i, byte) in bytes.withIndex()) {
-        matrix[byte.y][byte.x] = Cell.WALL
-        try {
-            val graph: Map<Point, List<Point>> = createGraph(matrix)
-            val path = bfs(graph)
-//            printMatrix(matrix, path)
-        } catch (e: PathNotFoundException) {
-            return i
+
+fun processData(patterns: List<String>, towels: List<String>): Int {
+    var sum = 0
+    val cache = HashMap<String, Int>()
+    for (towel in towels) {
+        val possibilities = isTowelPossible(patterns, towel, cache)
+        if (possibilities > 0) {
+            sum += possibilities
+            println("towel: $towel possible $possibilities times")
+        } else {
+            println("towel: $towel not possible")
         }
     }
-    throw Exception("path is always found")
+    return sum
 }
 
-fun bfs(graph: Map<Point, List<Point>>): List<Point> {
-    val start = Point(0, 0)
-    val end = Point(SIZE - 1, SIZE - 1)
-    val toVisit: Queue<List<Point>> = LinkedList()
-    val visited: MutableSet<Point> = mutableSetOf()
-
-    toVisit.add(listOf(start))
-
-    while (toVisit.isNotEmpty()) {
-        val path = toVisit.poll()
-        val point = path.last()
-
-        if (point == end) {
-            return path
-        }
-
-        for (neighbour in graph[point]!!) {
-            if (neighbour in visited) {
-                continue
-            }
-            visited.add(neighbour)
-            toVisit.add(path + neighbour)
+fun isTowelPossible(patterns: List<String>, towel: String, cache: HashMap<String, Int>): Int {
+    if (cache.containsKey(towel)) {
+        return cache[towel]!!
+    }
+    if (towel.isEmpty()) {
+        cache[towel] = 1
+        return 1
+    }
+    var sum = 0
+    for (pattern in patterns) {
+        if (towel.indexOf(pattern) == 0) {
+            val newTowel = towel.substring(pattern.length)
+            sum += isTowelPossible(patterns, newTowel, cache)
         }
     }
-    throw PathNotFoundException("path not found")
+    cache[towel] = sum
+    return sum
 }
 
-fun createGraph(matrix: Array<Array<Cell>>): Map<Point, List<Point>> {
-    val graph: MutableMap<Point, List<Point>> = mutableMapOf()
-    for (y in 0 until SIZE) {
-        for (x in 0 until SIZE) {
-            if (matrix[y][x] == Cell.WALL) {
-                continue
-            }
-            val point = Point(x, y)
-            val neighbours: MutableList<Point> = mutableListOf()
-            addPointIfPossible(x - 1, y, matrix, neighbours)
-            addPointIfPossible(x + 1, y, matrix, neighbours)
-            addPointIfPossible(x, y - 1, matrix, neighbours)
-            addPointIfPossible(x, y + 1, matrix, neighbours)
-            graph[point] = neighbours
-        }
-    }
-    return graph
-}
-
-private fun addPointIfPossible(x: Int, y: Int, matrix: Array<Array<Cell>>, neighbours: MutableList<Point>) {
-    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE || matrix[y][x] == Cell.WALL) {
-        return
-    }
-    val checkedPoint = Point(x, y)
-    neighbours.add(checkedPoint)
-}
-
-fun parseLines(data: String): Pair<Array<Array<Cell>>, List<Point>> {
-    val matrix = Array(SIZE) { Array(SIZE) { Cell.EMPTY } }
-    val bytes = data.split('\n')
-        .map { line ->
-            val (x, y) = line.split(',').map { it.toInt() }
-            Point(x, y)
-        }.toCollection(LinkedList<Point>())
-
-    return (matrix to bytes)
-}
-
-fun printMatrix(matrix: Array<Array<Cell>>, path: List<Point> = emptyList()) {
-    for (y in 0 until SIZE) {
-        for (x in 0 until SIZE) {
-            if (path.contains(Point(x, y))) {
-                print("O")
-            } else {
-                when (matrix[y][x]) {
-                    Cell.EMPTY -> print(".")
-                    Cell.WALL -> print("#")
-                }
-            }
-        }
-        println()
-    }
+fun parseLines(data: String): Pair<List<String>, List<String>> {
+    val (patternsString, towelsString) = data.split("\n\n")
+    val patterns = patternsString.split(", ").sortedByDescending { it.length }
+    val towels = towelsString.split("\n")
+    return patterns to towels
 }
