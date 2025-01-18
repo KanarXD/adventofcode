@@ -1,26 +1,24 @@
 package t19part2
 
-// 32140598
-
 fun main() {
 //    val file_path = "demo_input.txt"
     val file_path = "input.txt"
 
     val data = Thread.currentThread().contextClassLoader.getResource(file_path)!!.readText()
-    println(data)
+//    println(data)
 
     val (patterns, towels) = parseLines(data)
     println("patterns: $patterns")
     println("towels: $towels")
 
-    val output: Int = processData(patterns, towels)
+    val output: Long = processData(patterns, towels)
     println("Output: $output")
 }
 
 
-fun processData(patterns: List<String>, towels: List<String>): Int {
-    var sum = 0
-    val cache = HashMap<String, Int>()
+fun processData(patterns: List<String>, towels: List<String>): Long {
+    var sum: Long = 0
+    val cache = HashMap<String, Long>()
     for (towel in towels) {
         val possibilities = isTowelPossible(patterns, towel, cache)
         if (possibilities > 0) {
@@ -33,15 +31,17 @@ fun processData(patterns: List<String>, towels: List<String>): Int {
     return sum
 }
 
-fun isTowelPossible(patterns: List<String>, towel: String, cache: HashMap<String, Int>): Int {
+fun isTowelPossible(patterns: List<String>, towel: String, cache: HashMap<String, Long>): Long {
     if (cache.containsKey(towel)) {
+        println("cache hit '$towel', value: ${cache[towel]!!}")
         return cache[towel]!!
     }
     if (towel.isEmpty()) {
+        println("towel is possible")
         cache[towel] = 1
         return 1
     }
-    var sum = 0
+    var sum: Long = 0
     for (pattern in patterns) {
         if (towel.indexOf(pattern) == 0) {
             val newTowel = towel.substring(pattern.length)
