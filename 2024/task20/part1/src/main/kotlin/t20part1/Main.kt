@@ -13,7 +13,7 @@ enum class Cell {
 
 data class Point(val x: Int, val y: Int)
 
-data class PathToVisit(val path: Set<Point>, val checkPoint: Point, val canCheat: Int)
+data class PathToVisit(val path: List<Point>, val checkPoint: Point)
 
 data class GraphPosition(val neighbours: List<Point>, val cheatNeighbours: List<Point>)
 
@@ -38,16 +38,15 @@ fun processData(matrix: List<List<Cell>>): Int {
     val graph = createGraph(matrix)
     println("start: $start, end: $end")
 //    println(graph)
-    val base_paths = bfs(graph, start, end, Int.MAX_VALUE, 0)
-    val base_path = base_paths[0]
-    printMatrix(matrix, base_path)
+    val (cache, bestPath) = bfsInit(graph, start, end)
+    printMatrix(matrix, bestPath)
 
-    val maxPathLength = base_path.size - MIN_SAVE_PATH_LENGTH
+    val maxPathLength = bestPath.size - MIN_SAVE_PATH_LENGTH
 
-    val paths = bfs(graph, start, end, maxPathLength, 1)
-    paths.forEach {
-        println("saved moves: ${base_path.size - it.size}")
-        printMatrix(matrix, it)
+    val paths = bfs(graph, start, end, maxPathLength, cache)
+    paths.sortedDescending().forEach {
+        println("saved moves: ${bestPath.size - it}")
+//        printMatrix(matrix, it)
     }
     return paths.size
 }
@@ -57,46 +56,91 @@ fun bfs(
     start: Point,
     end: Point,
     maxPathLength: Int,
-    cheatCount: Int
-): List<Set<Point>> {
+    cache: Map<Point, Int>
+): List<Int> {
     val toVisit: Queue<PathToVisit> = LinkedList()
-    toVisit.add(PathToVisit(linkedSetOf(start), start, cheatCount))
-    val paths: MutableList<Set<Point>> = mutableListOf()
+    toVisit.add(PathToVisit(mutableListOf(start), start))
+    val paths: MutableList<Int> = mutableListOf()
     while (toVisit.isNotEmpty()) {
         val pathToVisit = toVisit.poll()
         val path = pathToVisit.path
         val point = pathToVisit.checkPoint
-        val canCheat = pathToVisit.canCheat
 
         if (path.size > maxPathLength) {
             continue
         }
 
         if (point == end) {
-            paths.add(path)
+            paths.add(path.size)
             continue
         }
 
         val graphPosition = graph[point]!!
 
-        if (canCheat > 0) {
-            for (neighbour in graphPosition.cheatNeighbours) {
-                if (neighbour in path) {
-                    continue
-                }
-                val newPath = path + neighbour
-                toVisit.add(PathToVisit(newPath, neighbour, canCheat - 1))
-            }
-        }
         for (neighbour in graphPosition.neighbours) {
             if (neighbour in path) {
                 continue
             }
             val newPath = path + neighbour
-            toVisit.add(PathToVisit(newPath, neighbour, canCheat))
+            toVisit.add(PathToVisit(newPath, neighbour))
+        }
+        for (neighbour in graphPosition.cheatNeighbours) {
+            if (neighbour in path || !cache.containsKey(neighbour)) {
+                continue
+            }
+            val currentDistance = path.size
+            val leftDistance = cache[neighbour]!!
+            val totalDistance = currentDistance + leftDistance + 2
+            if (totalDistance <= maxPathLength) {
+                paths.add(totalDistance)
+            }
         }
     }
     return paths
+}
+
+fun bfsInit(
+    graph: Map<Point, GraphPosition>,
+    start: Point,
+    end: Point,
+): Pair<Map<Point, Int>, List<Point>> {
+    val toVisit: Queue<PathToVisit> = LinkedList()
+    toVisit.add(PathToVisit(mutableListOf(start), start))
+    val cache: MutableMap<Point, Int> = mutableMapOf()
+    var bestPath: List<Point> = listOf()
+    while (toVisit.isNotEmpty()) {
+        val pathToVisit = toVisit.poll()
+        val path = pathToVisit.path
+        val point = pathToVisit.checkPoint
+
+        if (point == end) {
+            bestPath = path
+            updateCache(path, cache)
+            continue
+        }
+
+        val graphPosition = graph[point]!!
+        for (neighbour in graphPosition.neighbours) {
+            if (neighbour in path) {
+                continue
+            }
+            val newPath = path + neighbour
+            toVisit.add(PathToVisit(newPath, neighbour))
+        }
+    }
+    return cache to bestPath
+}
+
+private fun updateCache(
+    path: List<Point>,
+    cache: MutableMap<Point, Int>
+) {
+    for ((index, point) in path.withIndex()) {
+        val pointDistance = path.size - (index + 1)
+        if (cache.getOrDefault(point, Int.MAX_VALUE) > pointDistance) {
+            cache[point] = pointDistance
+        }
+    }
 }
 
 fun createGraph(matrix: List<List<Cell>>): Map<Point, GraphPosition> {
@@ -108,10 +152,14 @@ fun createGraph(matrix: List<List<Cell>>): Map<Point, GraphPosition> {
             val point = Point(x, y)
             val neighbours: MutableList<Point> = mutableListOf()
             val cheatNeighbours: MutableList<Point> = mutableListOf()
-            addPointIfPossible(x - 1, y, matrix, neighbours, cheatNeighbours)
-            addPointIfPossible(x + 1, y, matrix, neighbours, cheatNeighbours)
-            addPointIfPossible(x, y - 1, matrix, neighbours, cheatNeighbours)
-            addPointIfPossible(x, y + 1, matrix, neighbours, cheatNeighbours)
+            addPointIfPossible(x - 1, y, matrix, neighbours)
+            addPointIfPossible(x + 1, y, matrix, neighbours)
+            addPointIfPossible(x, y - 1, matrix, neighbours)
+            addPointIfPossible(x, y + 1, matrix, neighbours)
+            addPointIfPossible(x - 2, y, matrix, cheatNeighbours)
+            addPointIfPossible(x + 2, y, matrix, cheatNeighbours)
+            addPointIfPossible(x, y - 2, matrix, cheatNeighbours)
+            addPointIfPossible(x, y + 2, matrix, cheatNeighbours)
             graph[point] = GraphPosition(neighbours, cheatNeighbours)
         }
     }
@@ -123,19 +171,14 @@ private fun addPointIfPossible(
     y: Int,
     matrix: List<List<Cell>>,
     neighbours: MutableList<Point>,
-    cheatNeighbours: MutableList<Point>
 ) {
     val width = matrix[0].size
     val height = matrix.size
-    if (x < 0 || y < 0 || x >= width || y >= height) {
+    if (x < 0 || y < 0 || x >= width || y >= height || matrix[y][x] == Cell.WALL) {
         return
     }
     val checkedPoint = Point(x, y)
-    if (matrix[y][x] == Cell.WALL) {
-        cheatNeighbours.add(checkedPoint)
-    } else {
-        neighbours.add(checkedPoint)
-    }
+    neighbours.add(checkedPoint)
 }
 
 fun findCell(matrix: List<List<Cell>>, cell: Cell): Point {
@@ -171,7 +214,7 @@ fun parseLines(data: String): List<List<Cell>> {
     return matrix
 }
 
-fun printMatrix(matrix: List<List<Cell>>, path: Set<Point> = emptySet()) {
+fun printMatrix(matrix: List<List<Cell>>, path: Collection<Point> = emptySet()) {
     val width = matrix[0].size
     val height = matrix.size
 
