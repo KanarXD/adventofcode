@@ -199,9 +199,9 @@ fun bfsCheatPoints(
 
         if (matrix[y][x] != Cell.WALL) {
             if (!cheatPoints.containsKey(point) || cheatPoints[point]!!.size > path.size) {
-                cheatPoints[point] = path
+                cheatPoints[point] = path.toList()
             }
-            continue
+//            continue
         }
 
         for (neighbour in globalGraph[point]!!) {
