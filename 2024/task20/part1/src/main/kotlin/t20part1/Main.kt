@@ -13,8 +13,6 @@ enum class Cell {
 
 data class Point(val x: Int, val y: Int)
 
-data class PathToVisit(val path: List<Point>, val checkPoint: Point)
-
 data class GraphPosition(val neighbours: List<Point>, val cheatNeighbours: List<Point>)
 
 fun main() {
@@ -58,13 +56,12 @@ fun bfs(
     maxPathLength: Int,
     cache: Map<Point, Int>
 ): List<Int> {
-    val toVisit: Queue<PathToVisit> = LinkedList()
-    toVisit.add(PathToVisit(mutableListOf(start), start))
+    val toVisit: Queue<List<Point>> = LinkedList()
+    toVisit.add(mutableListOf(start))
     val paths: MutableList<Int> = mutableListOf()
     while (toVisit.isNotEmpty()) {
-        val pathToVisit = toVisit.poll()
-        val path = pathToVisit.path
-        val point = pathToVisit.checkPoint
+        val path = toVisit.poll()
+        val point = path.last()
 
         if (path.size > maxPathLength) {
             continue
@@ -82,7 +79,7 @@ fun bfs(
                 continue
             }
             val newPath = path + neighbour
-            toVisit.add(PathToVisit(newPath, neighbour))
+            toVisit.add(newPath)
         }
         for (neighbour in graphPosition.cheatNeighbours) {
             if (neighbour in path || !cache.containsKey(neighbour)) {
@@ -104,14 +101,13 @@ fun bfsInit(
     start: Point,
     end: Point,
 ): Pair<Map<Point, Int>, List<Point>> {
-    val toVisit: Queue<PathToVisit> = LinkedList()
-    toVisit.add(PathToVisit(mutableListOf(start), start))
+    val toVisit: Queue<List<Point>> = LinkedList()
+    toVisit.add(mutableListOf(start))
     val cache: MutableMap<Point, Int> = mutableMapOf()
     var bestPath: List<Point> = listOf()
     while (toVisit.isNotEmpty()) {
-        val pathToVisit = toVisit.poll()
-        val path = pathToVisit.path
-        val point = pathToVisit.checkPoint
+        val path = toVisit.poll()
+        val point = path.last()
 
         if (point == end) {
             bestPath = path
@@ -125,7 +121,7 @@ fun bfsInit(
                 continue
             }
             val newPath = path + neighbour
-            toVisit.add(PathToVisit(newPath, neighbour))
+            toVisit.add(newPath)
         }
     }
     return cache to bestPath
