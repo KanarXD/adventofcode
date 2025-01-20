@@ -1,10 +1,22 @@
 package t21part1
 
-enum class KeypadKey(value: Char) {
+enum class KeypadKey(val value: Char) {
     Key0('0'), Key1('1'), Key2('2'), Key3('3'), Key4('4'),
     Key5('5'), Key6('6'), Key7('7'), Key8('8'), Key9('9'),
-    ArrowUp('^'), ArrowLeft('<'), ArrowRight('>'), ArrowDown('v'),
-    KeyA('A'), UnusedKey('X')
+    ArrowUp('^'), ArrowLeft('<'), ArrowRight('>'), ArrowDown('v'), KeyA('A'), UnusedKey('X');
+
+    fun toChar(): Char = value
+
+    companion object {
+        fun fromChar(value: Char): KeypadKey {
+            for (key in entries) {
+                if (key.value == value) {
+                    return key
+                }
+            }
+            throw IllegalArgumentException("Unknown keypad key: $value")
+        }
+    }
 }
 
 data class Position(val x: Int, val y: Int)
@@ -62,12 +74,28 @@ fun main() {
 }
 
 fun processData(codes: List<String>): Int {
-    for (code in codes) {
+    val numericToDirection: Map<KeypadKey, List<KeypadKey>> = findNumericToDirection()
 
-
+    for (code in codes.take(1)) {
+        val sequence: MutableList<KeypadKey> = mutableListOf()
+        for (letter in code) {
+            val key = KeypadKey.fromChar(letter)
+            val keySequence = numericToDirection[key]!!
+            sequence.addAll(keySequence)
+        }
+        println(sequence.map { it.toChar() }.joinToString(""))
     }
 
     return 0
+}
+
+fun findNumericToDirection(): Map<KeypadKey, List<KeypadKey>> {
+    return mapOf(
+        KeypadKey.Key0 to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
+        KeypadKey.Key2 to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
+        KeypadKey.Key9 to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
+        KeypadKey.KeyA to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
+    )
 }
 
 fun calculateResult(sequence: String, code: String): Int {
