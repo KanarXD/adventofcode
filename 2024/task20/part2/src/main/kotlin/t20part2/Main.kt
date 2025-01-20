@@ -2,7 +2,7 @@ package t20part2
 
 import java.util.*
 
-const val MIN_SAVE_PATH_LENGTH = 72
+const val MIN_SAVE_PATH_LENGTH = 70
 const val MAX_CHEAT_LENGTH = 20
 
 enum class Cell {
@@ -47,7 +47,7 @@ fun processData(matrix: List<List<Cell>>): Int {
     val paths = bfs(graph, start, end, maxPathLength, cache)
     paths.sortedByDescending { it.size }.forEach {
         println("saved moves: ${bestPath.size - it.size}")
-        printMatrix(matrix, it)
+//        printMatrix(matrix, it)
     }
     return paths.size
 }
