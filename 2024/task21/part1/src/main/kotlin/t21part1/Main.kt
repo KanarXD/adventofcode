@@ -64,9 +64,6 @@ val DIRECTIONAL_KEYPAD = listOf(
     listOf(KeypadKey.ArrowLeft, KeypadKey.ArrowDown, KeypadKey.ArrowRight),
 )
 
-val NUMERIC_GRAPH = generateGraph(NUMERIC_KEYPAD)
-val DIRECTIONAL_GRAPH = generateGraph(DIRECTIONAL_KEYPAD)
-
 fun main() {
     val file_path = "demo_input.txt"
 //    val file_path = "input.txt"
@@ -82,7 +79,8 @@ fun main() {
 }
 
 fun processData(codes: List<String>): Int {
-    val numericToDirection: Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> = findKeypadKeyToDirection(NUMERIC_KEYPAD)
+    val numericToDirection = findKeypadKeyToDirection(NUMERIC_KEYPAD)
+    val directionToDirection = findKeypadKeyToDirection(DIRECTIONAL_KEYPAD)
     var sum = 0
     for (code in codes.take(1)) {
         println("Code: $code")
