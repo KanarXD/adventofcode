@@ -61,10 +61,12 @@ fun processData(codes: List<String>): Int {
 
         val codeList = code.map { KeypadKey.fromChar(it) }
         val s1 = sequenceToSequence(numericToDirection, codeList)
+        println("s1: ${getSequenceString(s1)}")
         val s2 = sequenceToSequence(directionToDirection, s1)
+        println("s2: ${getSequenceString(s2)}")
         val s3 = sequenceToSequence(directionToDirection, s2)
 
-        val sequenceString = s3.map { it.toChar() }.joinToString("")
+        val sequenceString = getSequenceString(s3)
         val result = calculateResult(sequenceString, code)
         println("SequenceString: $sequenceString")
         println("Result: $result")
@@ -73,21 +75,21 @@ fun processData(codes: List<String>): Int {
     return sum
 }
 
+private fun getSequenceString(s3: List<KeypadKey>) = s3.map { it.toChar() }.joinToString("")
+
 fun sequenceToSequence(
     mapper: Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>>, sequence: List<KeypadKey>
 ): List<KeypadKey> {
     val result: MutableList<KeypadKey> = mutableListOf()
     var lastKey = KeypadKey.KeyA
-    var lastSequence: List<KeypadKey> = listOf()
     for (key in sequence) {
-        val keyPair = lastKey to key
         if (lastKey == key) {
-            result.addAll(lastSequence)
+            result.add(KeypadKey.KeyA)
         } else {
+            val keyPair = lastKey to key
             val keySequence = mapper[keyPair]!!
             result.addAll(keySequence)
             lastKey = key
-            lastSequence = keySequence
         }
     }
     return result
@@ -149,10 +151,10 @@ fun generateGraph(matrix: List<List<KeypadKey>>): Map<Position, List<DirectionPo
         for (x in 0 until width) {
             val position = Position(x, y)
             val neighbours: MutableList<DirectionPosition> = mutableListOf()
-            addPointIfPossible(x - 1, y, matrix, neighbours, KeypadKey.ArrowLeft)
             addPointIfPossible(x + 1, y, matrix, neighbours, KeypadKey.ArrowRight)
-            addPointIfPossible(x, y - 1, matrix, neighbours, KeypadKey.ArrowUp)
             addPointIfPossible(x, y + 1, matrix, neighbours, KeypadKey.ArrowDown)
+            addPointIfPossible(x - 1, y, matrix, neighbours, KeypadKey.ArrowLeft)
+            addPointIfPossible(x, y - 1, matrix, neighbours, KeypadKey.ArrowUp)
             graph[position] = neighbours
         }
     }
