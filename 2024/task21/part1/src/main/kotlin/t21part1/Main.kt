@@ -26,32 +26,6 @@ data class Position(val x: Int, val y: Int)
 
 data class DirectionPosition(val direction: KeypadKey, val position: Position)
 
-data class Keypad(var currentPosition: Position, val keys: List<List<KeypadKey>>) {
-    fun moveCursor(direction: KeypadKey) {
-        val (x, y) = currentPosition
-        val newPosition = when (direction) {
-            KeypadKey.ArrowUp -> currentPosition.copy(y = y - 1)
-            KeypadKey.ArrowDown -> currentPosition.copy(y = y + 1)
-            KeypadKey.ArrowLeft -> currentPosition.copy(x = x - 1)
-            KeypadKey.ArrowRight -> currentPosition.copy(x = x + 1)
-            else -> throw Exception("Key '$direction' is not direction")
-        }
-        if (isValidPosition(newPosition)) {
-            currentPosition = newPosition
-        }
-    }
-
-    fun click(): KeypadKey {
-        val (x, y) = currentPosition
-        return keys[y][x]
-    }
-
-    private fun isValidPosition(position: Position): Boolean {
-        val (x, y) = position
-        return x >= 0 && x < keys[0].size && y >= 0 && y < keys.size && keys[y][x] != KeypadKey.UnusedKey
-    }
-}
-
 val NUMERIC_KEYPAD = listOf(
     listOf(KeypadKey.Key7, KeypadKey.Key8, KeypadKey.Key9),
     listOf(KeypadKey.Key4, KeypadKey.Key5, KeypadKey.Key6),
@@ -82,24 +56,41 @@ fun processData(codes: List<String>): Int {
     val numericToDirection = findKeypadKeyToDirection(NUMERIC_KEYPAD)
     val directionToDirection = findKeypadKeyToDirection(DIRECTIONAL_KEYPAD)
     var sum = 0
-    for (code in codes.take(1)) {
+    for (code in codes) {
         println("Code: $code")
-        val sequence: MutableList<KeypadKey> = mutableListOf()
-        var lastKey = KeypadKey.KeyA
-        for (letter in code) {
-            val key = KeypadKey.fromChar(letter)
-            val keySequence = numericToDirection[lastKey to key]!!
-            sequence.addAll(keySequence)
-            lastKey = key
-        }
 
-        val sequenceString = sequence.map { it.toChar() }.joinToString("")
+        val codeList = code.map { KeypadKey.fromChar(it) }
+        val s1 = sequenceToSequence(numericToDirection, codeList)
+        val s2 = sequenceToSequence(directionToDirection, s1)
+        val s3 = sequenceToSequence(directionToDirection, s2)
+
+        val sequenceString = s3.map { it.toChar() }.joinToString("")
         val result = calculateResult(sequenceString, code)
         println("SequenceString: $sequenceString")
         println("Result: $result")
         sum += result
     }
     return sum
+}
+
+fun sequenceToSequence(
+    mapper: Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>>, sequence: List<KeypadKey>
+): List<KeypadKey> {
+    val result: MutableList<KeypadKey> = mutableListOf()
+    var lastKey = KeypadKey.KeyA
+    var lastSequence: List<KeypadKey> = listOf()
+    for (key in sequence) {
+        val keyPair = lastKey to key
+        if (lastKey == key) {
+            result.addAll(lastSequence)
+        } else {
+            val keySequence = mapper[keyPair]!!
+            result.addAll(keySequence)
+            lastKey = key
+            lastSequence = keySequence
+        }
+    }
+    return result
 }
 
 fun findKeypadKeyToDirection(matrix: List<List<KeypadKey>>): Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> {
