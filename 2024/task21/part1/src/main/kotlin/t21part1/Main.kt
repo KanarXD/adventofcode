@@ -1,5 +1,8 @@
 package t21part1
 
+import java.util.*
+
+
 enum class KeypadKey(val value: Char) {
     Key0('0'), Key1('1'), Key2('2'), Key3('3'), Key4('4'),
     Key5('5'), Key6('6'), Key7('7'), Key8('8'), Key9('9'),
@@ -20,6 +23,8 @@ enum class KeypadKey(val value: Char) {
 }
 
 data class Position(val x: Int, val y: Int)
+
+data class DirectionPosition(val direction: KeypadKey, val position: Position)
 
 data class Keypad(var currentPosition: Position, val keys: List<List<KeypadKey>>) {
     fun moveCursor(direction: KeypadKey) {
@@ -59,6 +64,9 @@ val DIRECTIONAL_KEYPAD = listOf(
     listOf(KeypadKey.ArrowLeft, KeypadKey.ArrowDown, KeypadKey.ArrowRight),
 )
 
+val NUMERIC_GRAPH = generateGraph(NUMERIC_KEYPAD)
+val DIRECTIONAL_GRAPH = generateGraph(DIRECTIONAL_KEYPAD)
+
 fun main() {
     val file_path = "demo_input.txt"
 //    val file_path = "input.txt"
@@ -74,28 +82,104 @@ fun main() {
 }
 
 fun processData(codes: List<String>): Int {
-    val numericToDirection: Map<KeypadKey, List<KeypadKey>> = findNumericToDirection()
-
+    val numericToDirection: Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> = findKeypadKeyToDirection(NUMERIC_KEYPAD)
+    var sum = 0
     for (code in codes.take(1)) {
+        println("Code: $code")
         val sequence: MutableList<KeypadKey> = mutableListOf()
+        var lastKey = KeypadKey.KeyA
         for (letter in code) {
             val key = KeypadKey.fromChar(letter)
-            val keySequence = numericToDirection[key]!!
+            val keySequence = numericToDirection[lastKey to key]!!
             sequence.addAll(keySequence)
+            lastKey = key
         }
-        println(sequence.map { it.toChar() }.joinToString(""))
-    }
 
-    return 0
+        val sequenceString = sequence.map { it.toChar() }.joinToString("")
+        val result = calculateResult(sequenceString, code)
+        println("SequenceString: $sequenceString")
+        println("Result: $result")
+        sum += result
+    }
+    return sum
 }
 
-fun findNumericToDirection(): Map<KeypadKey, List<KeypadKey>> {
-    return mapOf(
-        KeypadKey.Key0 to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
-        KeypadKey.Key2 to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
-        KeypadKey.Key9 to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
-        KeypadKey.KeyA to listOf(KeypadKey.ArrowDown, KeypadKey.ArrowLeft, KeypadKey.ArrowRight),
-    )
+fun findKeypadKeyToDirection(matrix: List<List<KeypadKey>>): Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> {
+    val graph = generateGraph(matrix)
+    val positionMap: MutableMap<Pair<Position, Position>, List<KeypadKey>> = mutableMapOf()
+    val queue: Queue<List<DirectionPosition>> = LinkedList()
+    val width = matrix[0].size
+    val height = matrix.size
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val position = Position(x, y)
+            if (matrix[y][x] != KeypadKey.UnusedKey) {
+                queue.add(mutableListOf(DirectionPosition(KeypadKey.UnusedKey, position)))
+            }
+        }
+    }
+
+    while (queue.isNotEmpty()) {
+        val path = queue.poll()
+        val basePosition = path.first().position
+        val directionPosition = path.last()
+        val position = directionPosition.position
+
+        if (basePosition != position) {
+            val keyPath = basePosition to position
+            if (!positionMap.containsKey(keyPath) || positionMap[keyPath]!!.size > path.size) {
+                positionMap[keyPath] = path.map { it.direction }.toList()
+            }
+        }
+
+        val pathPositions = path.map { it.position }
+        for (neighborDirectionPosition in graph[position]!!) {
+            if (neighborDirectionPosition.position in pathPositions) {
+                continue
+            }
+            val newPath = path + neighborDirectionPosition
+            queue.add(newPath)
+        }
+    }
+
+    val result: MutableMap<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> = mutableMapOf()
+    positionMap.forEach { entry ->
+        val keyLeft = positionToKey(entry.key.first, matrix)
+        val keyRight = positionToKey(entry.key.second, matrix)
+        val key = keyLeft to keyRight
+        result[key] = entry.value.drop(1) + KeypadKey.KeyA
+    }
+    return result
+}
+
+fun generateGraph(matrix: List<List<KeypadKey>>): Map<Position, List<DirectionPosition>> {
+    val graph: MutableMap<Position, List<DirectionPosition>> = mutableMapOf()
+    val width = matrix[0].size
+    val height = matrix.size
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val position = Position(x, y)
+            val neighbours: MutableList<DirectionPosition> = mutableListOf()
+            addPointIfPossible(x - 1, y, matrix, neighbours, KeypadKey.ArrowLeft)
+            addPointIfPossible(x + 1, y, matrix, neighbours, KeypadKey.ArrowRight)
+            addPointIfPossible(x, y - 1, matrix, neighbours, KeypadKey.ArrowUp)
+            addPointIfPossible(x, y + 1, matrix, neighbours, KeypadKey.ArrowDown)
+            graph[position] = neighbours
+        }
+    }
+    return graph
+}
+
+fun addPointIfPossible(
+    x: Int, y: Int, matrix: List<List<KeypadKey>>, neighbours: MutableList<DirectionPosition>, direction: KeypadKey
+) {
+    val width = matrix[0].size
+    val height = matrix.size
+    if (x < 0 || y < 0 || x >= width || y >= height || matrix[y][x] == KeypadKey.UnusedKey) {
+        return
+    }
+    val position = Position(x, y)
+    neighbours.add(DirectionPosition(direction, position))
 }
 
 fun calculateResult(sequence: String, code: String): Int {
@@ -105,4 +189,8 @@ fun calculateResult(sequence: String, code: String): Int {
 
 fun parseLines(data: String): List<String> {
     return data.split("\n")
+}
+
+fun positionToKey(position: Position, matrix: List<List<KeypadKey>>): KeypadKey {
+    return matrix[position.y][position.x]
 }
