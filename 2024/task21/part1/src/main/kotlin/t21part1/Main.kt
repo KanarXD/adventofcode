@@ -39,8 +39,8 @@ val DIRECTIONAL_KEYPAD = listOf(
 )
 
 fun main() {
-    val file_path = "demo_input.txt"
-//    val file_path = "input.txt"
+//    val file_path = "demo_input.txt"
+    val file_path = "input.txt"
 
     val data = Thread.currentThread().contextClassLoader.getResource(file_path)!!.readText()
 //    println(data)
@@ -53,20 +53,26 @@ fun main() {
 }
 
 fun processData(codes: List<String>): Int {
-    val numericToDirection = findKeypadKeyToDirection(NUMERIC_KEYPAD)
-    val directionToDirection = findKeypadKeyToDirection(DIRECTIONAL_KEYPAD)
+    val numericToDirection = findKeypadKeyToDirection(NUMERIC_KEYPAD, 0)
+    val directionToDirection = findKeypadKeyToDirection(DIRECTIONAL_KEYPAD, 0)
     var sum = 0
     for (code in codes) {
         println("Code: $code")
 
         val codeList = code.map { KeypadKey.fromChar(it) }
         val s1 = sequenceToSequence(numericToDirection, codeList)
-        println("s1: ${getSequenceString(s1)}")
-        val s2 = sequenceToSequence(directionToDirection, s1)
-        println("s2: ${getSequenceString(s2)}")
-        val s3 = sequenceToSequence(directionToDirection, s2)
+        val s2 = s1.map { sequence ->
+//            println("s1: ${getSequenceString(sequence)}")
+            sequenceToSequence(directionToDirection, sequence)
+        }.flatten()
 
-        val sequenceString = getSequenceString(s3)
+        val s3 = s2.map { sequence ->
+//            println("s2: ${getSequenceString(sequence)}")
+            sequenceToSequence(directionToDirection, sequence)
+        }.flatten()
+
+        val sequence = s3.minBy { it.size }
+        val sequenceString = getSequenceString(sequence)
         val result = calculateResult(sequenceString, code)
         println("SequenceString: $sequenceString")
         println("Result: $result")
@@ -78,26 +84,50 @@ fun processData(codes: List<String>): Int {
 private fun getSequenceString(s3: List<KeypadKey>) = s3.map { it.toChar() }.joinToString("")
 
 fun sequenceToSequence(
-    mapper: Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>>, sequence: List<KeypadKey>
-): List<KeypadKey> {
-    val result: MutableList<KeypadKey> = mutableListOf()
-    var lastKey = KeypadKey.KeyA
-    for (key in sequence) {
-        if (lastKey == key) {
-            result.add(KeypadKey.KeyA)
+    mapper: Map<Pair<KeypadKey, KeypadKey>, List<List<KeypadKey>>>, baseSequence: List<KeypadKey>
+): List<List<KeypadKey>> {
+    val result: MutableList<List<KeypadKey>> = mutableListOf()
+
+    val queue: Queue<List<List<KeypadKey>>> = LinkedList()
+    mapper[KeypadKey.KeyA to baseSequence.first()]!!.forEach {
+        queue.add(listOf(it))
+    }
+
+    while (queue.isNotEmpty()) {
+        val sequences = queue.poll()!!
+        val index = sequences.size
+
+        if (baseSequence.size <= index) {
+            result.add(sequences.flatten())
+            continue
+        }
+
+        val leftKey = baseSequence[index - 1]
+        val rightKey = baseSequence[index]
+
+        if (leftKey == rightKey) {
+            val newSequences: MutableList<List<KeypadKey>> = sequences.toMutableList()
+            newSequences.add(listOf(KeypadKey.KeyA))
+            queue.add(newSequences)
         } else {
-            val keyPair = lastKey to key
-            val keySequence = mapper[keyPair]!!
-            result.addAll(keySequence)
-            lastKey = key
+            val key = leftKey to rightKey
+            for (nextSequence in mapper[key]!!) {
+                val newSequences: MutableList<List<KeypadKey>> = sequences.toMutableList()
+                newSequences.add(nextSequence)
+                queue.add(newSequences)
+            }
         }
     }
+
     return result
 }
 
-fun findKeypadKeyToDirection(matrix: List<List<KeypadKey>>): Map<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> {
+fun findKeypadKeyToDirection(
+    matrix: List<List<KeypadKey>>,
+    maxDifference: Int
+): Map<Pair<KeypadKey, KeypadKey>, List<List<KeypadKey>>> {
     val graph = generateGraph(matrix)
-    val positionMap: MutableMap<Pair<Position, Position>, List<KeypadKey>> = mutableMapOf()
+    val positionMap: MutableMap<Pair<Position, Position>, MutableList<List<KeypadKey>>> = mutableMapOf()
     val queue: Queue<List<DirectionPosition>> = LinkedList()
     val width = matrix[0].size
     val height = matrix.size
@@ -118,8 +148,19 @@ fun findKeypadKeyToDirection(matrix: List<List<KeypadKey>>): Map<Pair<KeypadKey,
 
         if (basePosition != position) {
             val keyPath = basePosition to position
-            if (!positionMap.containsKey(keyPath) || positionMap[keyPath]!!.size > path.size) {
-                positionMap[keyPath] = path.map { it.direction }.toList()
+            val directionList = path.map { it.direction }.toList()
+            if (positionMap.containsKey(keyPath)) {
+                val positionList = positionMap[keyPath]!!
+                val minSize = positionList.minOf { it.size }
+
+                if (minSize + maxDifference >= directionList.size) {
+                    positionList.removeIf {
+                        it.size > directionList.size + maxDifference
+                    }
+                    positionList.add(directionList)
+                }
+            } else {
+                positionMap[keyPath] = mutableListOf(directionList)
             }
         }
 
@@ -133,12 +174,12 @@ fun findKeypadKeyToDirection(matrix: List<List<KeypadKey>>): Map<Pair<KeypadKey,
         }
     }
 
-    val result: MutableMap<Pair<KeypadKey, KeypadKey>, List<KeypadKey>> = mutableMapOf()
+    val result: MutableMap<Pair<KeypadKey, KeypadKey>, List<List<KeypadKey>>> = mutableMapOf()
     positionMap.forEach { entry ->
         val keyLeft = positionToKey(entry.key.first, matrix)
         val keyRight = positionToKey(entry.key.second, matrix)
         val key = keyLeft to keyRight
-        result[key] = entry.value.drop(1) + KeypadKey.KeyA
+        result[key] = entry.value.map { it.drop(1) + KeypadKey.KeyA }
     }
     return result
 }
