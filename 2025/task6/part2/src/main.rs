@@ -33,7 +33,7 @@ impl Problem {
 
 fn main() {
     let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    let file_path = "res/input.txt";
 
     let data: String =
         fs::read_to_string(file_path).expect(format!("failed to read file: {file_path}").as_str());
@@ -66,13 +66,18 @@ fn parse_lines(data: String) -> Vec<Problem> {
         })
         .collect();
 
-    for &line in lines[0..lines.len() - 1].iter() {
-        line.split_whitespace()
-            .enumerate()
-            .for_each(|(index, number)| {
-                let number = number.parse::<u64>().unwrap();
-                problems[index].numbers.push(number);
-            });
+    let mut problem_index = 0;
+    for letter_index in 0..lines[0].len() {
+        let mut letters = String::new();
+        for row in 0..lines.len() - 1 {
+            let letter = lines[row].chars().nth(letter_index).unwrap();
+            letters.push(letter);
+        }
+        if let Ok(number) = letters.trim().parse::<u64>() {
+            problems[problem_index].numbers.push(number);
+        } else {
+            problem_index += 1;
+        }
     }
 
     problems
