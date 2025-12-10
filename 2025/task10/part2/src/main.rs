@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::BTreeMap;
 use std::fs;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -48,7 +48,11 @@ struct Voltages {
     desired_values: Rc<Vec<usize>>,
     values: Vec<usize>,
 }
+
 impl Voltages {
+    pub fn score(&self) -> usize {
+        self.values.iter().sum()
+    }
     fn is_desired(&self) -> VoltageLevel {
         let mut not_enough = false;
         for (desired, power) in self.desired_values.iter().zip(self.values.iter()) {
@@ -97,11 +101,15 @@ impl Calculation {
             voltages: self.voltages.apply_wiring(wire),
         }
     }
+
+    fn score(&self) -> usize {
+        self.voltages.score()
+    }
 }
 
 fn main() {
     let file_path = "res/demo_input.txt";
-    let file_path = "res/input.txt";
+    // let file_path = "res/input.txt";
 
     let data: String =
         fs::read_to_string(file_path).expect(format!("failed to read file: {file_path}").as_str());
@@ -119,23 +127,71 @@ fn process_data(mut machines: &Vec<Machine>) -> u64 {
     machines.iter().map(|machine| check_machine(machine)).sum()
 }
 
-fn check_machine(machine: &Machine) -> u64 {
-    let mut queue: VecDeque<Calculation> = VecDeque::new();
-    queue.push_back(Calculation {
+fn check_machine2(machine: &Machine) -> u64 {
+    let calculation = Calculation {
         steps: 0,
         voltages: machine.voltages.clone(),
-    });
+    };
+    let result = dfs(machine, calculation).expect("result has to exist");
+
+    println!("Machine: {:?}, needs steps: {}", machine, result);
+    result
+}
+
+fn dfs(machine: &Machine, calculation: Calculation) -> Option<u64> {
+    let mut min_calculation = None;
+    for wire in machine.wirings.iter() {
+        let new_calculation = calculation.apply_wire(&wire);
+        match new_calculation.voltages.is_desired() {
+            VoltageLevel::Less => {
+                if let Some(result) = dfs(machine, new_calculation) {
+                    if let Some(min_calculation) = &mut min_calculation {
+                        if *min_calculation > result {
+                            *min_calculation = result;
+                        }
+                    } else {
+                        min_calculation = Some(result);
+                    }
+                }
+            }
+            VoltageLevel::Equal => {
+                let result = new_calculation.steps;
+                if let Some(min_calculation) = &mut min_calculation {
+                    if *min_calculation > result {
+                        *min_calculation = result;
+                    }
+                } else {
+                    min_calculation = Some(result);
+                }
+            }
+            VoltageLevel::Overload => {
+                // println!("Machine: {:?}, overload: {:?}", machine, new_calculation);
+            }
+        }
+    }
+    min_calculation
+}
+
+fn check_machine(machine: &Machine) -> u64 {
+    let mut queue: BTreeMap<usize, Calculation> = BTreeMap::new();
+    // let mut queue: VecDeque<Calculation> = VecDeque::new();
+    let calculation = Calculation {
+        steps: 0,
+        voltages: machine.voltages.clone(),
+    };
+    queue.insert(calculation.score(), calculation);
+
     loop {
-        let calculation = queue
-            .pop_front()
-            .expect("machine has to exist at least one");
+        let (_, calculation) = queue.pop_last().expect("machine has to exist at least one");
+        println!("queue={:?}", queue);
+
         // println!("checking calculation = {:?}", calculation);
 
         for wire in machine.wirings.iter() {
             let new_calculation = calculation.apply_wire(&wire);
             match new_calculation.voltages.is_desired() {
                 VoltageLevel::Less => {
-                    queue.push_back(new_calculation);
+                    queue.insert(new_calculation.score(), new_calculation);
                 }
                 VoltageLevel::Equal => {
                     println!(
