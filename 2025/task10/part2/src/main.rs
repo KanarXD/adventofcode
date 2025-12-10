@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::fs;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -43,10 +44,16 @@ impl Lights {
 pub struct Wiring {
     states: Vec<usize>,
 }
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialOrd, PartialEq, Eq, Clone)]
 struct Voltages {
     desired_values: Rc<Vec<usize>>,
     values: Vec<usize>,
+    score: usize,
+}
+impl Ord for Voltages {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.score.cmp(&other.score)
+    }
 }
 
 impl Voltages {
@@ -77,6 +84,7 @@ impl Voltages {
 
         Voltages {
             desired_values: self.desired_values.clone(),
+            score: new_values.iter().sum(),
             values: new_values,
         }
     }
@@ -89,10 +97,16 @@ enum VoltageLevel {
     Overload,
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialOrd, PartialEq, Eq, Clone)]
 struct Calculation {
     voltages: Voltages,
     steps: u64,
+}
+
+impl Ord for Calculation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.voltages.cmp(&other.voltages)
+    }
 }
 impl Calculation {
     fn apply_wire(&self, wire: &Wiring) -> Calculation {
@@ -109,7 +123,7 @@ impl Calculation {
 
 fn main() {
     let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    let file_path = "res/input.txt";
 
     let data: String =
         fs::read_to_string(file_path).expect(format!("failed to read file: {file_path}").as_str());
@@ -173,17 +187,17 @@ fn dfs(machine: &Machine, calculation: Calculation) -> Option<u64> {
 }
 
 fn check_machine(machine: &Machine) -> u64 {
-    let mut queue: BTreeMap<usize, Calculation> = BTreeMap::new();
-    // let mut queue: VecDeque<Calculation> = VecDeque::new();
+    let mut queue: BinaryHeap<Calculation> = BinaryHeap::new();
     let calculation = Calculation {
         steps: 0,
         voltages: machine.voltages.clone(),
     };
-    queue.insert(calculation.score(), calculation);
+    queue.push(calculation);
 
     loop {
-        let (_, calculation) = queue.pop_last().expect("machine has to exist at least one");
-        println!("queue={:?}", queue);
+        let calculation = queue.pop().expect("machine has to exist at least one");
+
+        // println!("queue={:?}", queue);
 
         // println!("checking calculation = {:?}", calculation);
 
@@ -191,7 +205,7 @@ fn check_machine(machine: &Machine) -> u64 {
             let new_calculation = calculation.apply_wire(&wire);
             match new_calculation.voltages.is_desired() {
                 VoltageLevel::Less => {
-                    queue.insert(new_calculation.score(), new_calculation);
+                    queue.push(new_calculation);
                 }
                 VoltageLevel::Equal => {
                     println!(
@@ -254,6 +268,7 @@ fn parse_lines(data: String) -> Vec<Machine> {
             let voltages = Voltages {
                 desired_values: Rc::new(voltages),
                 values: actual_voltages,
+                score: 0,
             };
 
             Machine {
