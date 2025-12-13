@@ -45,8 +45,40 @@ impl Matrix {
         }
         Matrix { tiles }
     }
-    fn add_matrix(&mut self, matrix: &Matrix) -> Option<Matrix> {
-        todo!()
+    fn try_add_matrix(&self, matrix: &Matrix) -> Option<Matrix> {
+        for sy in 0..=self.tiles.len() - matrix.tiles.len() {
+            for sx in 0..=self.tiles[0].len() - matrix.tiles[0].len() {
+                let not_occupied = self.is_space_not_occupied(matrix, sy, sx);
+                if not_occupied {
+                    let new_matrix = self.clone();
+                    return Some(new_matrix.insert_matrix(matrix, sy, sx));
+                }
+            }
+        }
+        None
+    }
+
+    fn insert_matrix(mut self, matrix: &Matrix, sy: usize, sx: usize) -> Self {
+        for y in 0..matrix.tiles.len() {
+            for x in 0..matrix.tiles[0].len() {
+                self.tiles[sy + y][sx + x] = matrix.tiles[y][x];
+            }
+        }
+        self
+    }
+
+    fn is_space_not_occupied(&self, matrix: &Matrix, sy: usize, sx: usize) -> bool {
+        for my in 0..matrix.tiles.len() {
+            for mx in 0..matrix.tiles[0].len() {
+                if matrix.tiles[my][mx] == Tile::Empty {
+                    continue;
+                }
+                if self.tiles[sy + my][sx + mx] != Tile::Empty {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -65,20 +97,33 @@ struct Region {
 impl Region {
     fn fits_presents(&self, presents: &HashMap<usize, Present>) -> bool {
         let matrix = Matrix::new(self.height, self.width);
-        self.dfs(&matrix, presents, self.presents.clone())
+        let fits = self.dfs(&matrix, presents, self.presents.clone());
+        println!("region: {:?} fits_presents: {:?}", self, fits);
+
+        fits
     }
 
     fn dfs(
         &self,
         matrix: &Matrix,
         presents: &HashMap<usize, Present>,
-        left_presents: Vec<usize>,
+        mut left_presents: Vec<usize>,
     ) -> bool {
         let Some((index, count)) = left_presents.iter().enumerate().find(|&(_, v)| *v > 0) else {
             return true;
         };
+        left_presents[index] -= 1;
+        let present = presents.get(&index).unwrap();
+        for present_matrix in present.matrices.iter() {
+            if let Some(new_matrix) = matrix.try_add_matrix(present_matrix) {
+                let found_space = self.dfs(&new_matrix, presents, left_presents.clone());
+                if found_space {
+                    return true;
+                }
+            }
+        }
 
-        todo!()
+        false
     }
 }
 
@@ -103,6 +148,7 @@ fn process_data(presents: &HashMap<usize, Present>, regions: &Vec<Region>) -> u6
 
     regions
         .iter()
+        .take(1)
         .filter(|region| region.fits_presents(presents))
         .count() as u64
 }
