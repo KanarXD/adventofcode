@@ -84,6 +84,7 @@ impl Matrix {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct Present {
+    tile_count: usize,
     index: usize,
     matrices: Vec<Matrix>,
 }
@@ -96,11 +97,32 @@ struct Region {
 
 impl Region {
     fn fits_presents(&self, presents: &HashMap<usize, Present>) -> bool {
+        let has_enough_tiles = self.has_enough_tiles(presents);
+        if !has_enough_tiles {
+            println!("region: {:?} has not enough tiles", self);
+            return false;
+        }
+
         let matrix = Matrix::new(self.height, self.width);
         let fits = self.dfs(&matrix, presents, self.presents.clone());
         println!("region: {:?} fits_presents: {:?}", self, fits);
 
         fits
+    }
+
+    fn has_enough_tiles(&self, presents: &HashMap<usize, Present>) -> bool {
+        let all_tiles = self.width * self.height;
+        let presents_tile_count: usize = self
+            .presents
+            .iter()
+            .enumerate()
+            .map(|(index, count)| {
+                let present = presents.get(&index).unwrap();
+                present.tile_count * count
+            })
+            .sum();
+
+        presents_tile_count <= all_tiles
     }
 
     fn dfs(
@@ -129,7 +151,7 @@ impl Region {
 
 fn main() {
     let file_path = "res/demo_input.txt";
-    // let file_path = "res/input.txt";
+    let file_path = "res/input.txt";
 
     let data: String =
         fs::read_to_string(file_path).expect(format!("failed to read file: {file_path}").as_str());
@@ -148,7 +170,6 @@ fn process_data(presents: &HashMap<usize, Present>, regions: &Vec<Region>) -> u6
 
     regions
         .iter()
-        .take(1)
         .filter(|region| region.fits_presents(presents))
         .count() as u64
 }
@@ -165,6 +186,7 @@ fn parse_lines(data: &String) -> (HashMap<usize, Present>, Vec<Region>) {
             let s_lines = section.lines().collect::<Vec<&str>>();
             let index_line = s_lines[0];
             let index = index_line[..index_line.len() - 1].parse::<usize>().unwrap();
+            let mut tile_count = 0;
             let tiles = s_lines[1..s_lines.len()]
                 .into_iter()
                 .map(|tile_line| {
@@ -172,7 +194,10 @@ fn parse_lines(data: &String) -> (HashMap<usize, Present>, Vec<Region>) {
                         .chars()
                         .map(|c| match c {
                             '.' => Tile::Empty,
-                            '#' => Tile::Occupied,
+                            '#' => {
+                                tile_count += 1;
+                                Tile::Occupied
+                            }
                             _ => panic!("unknown tile: {}", c),
                         })
                         .collect::<Vec<Tile>>()
@@ -188,7 +213,11 @@ fn parse_lines(data: &String) -> (HashMap<usize, Present>, Vec<Region>) {
                 matrix,
             ];
 
-            let present = Present { index, matrices };
+            let present = Present {
+                tile_count,
+                index,
+                matrices,
+            };
             (index, present)
         })
         .collect::<HashMap<usize, Present>>();
