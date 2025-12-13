@@ -4,5 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-regex = "1.11.1"
-diagonal = "0.1.0"
+z3 = "0.19.6"

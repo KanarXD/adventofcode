@@ -1,8 +1,9 @@
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::HashMap;
 use std::fs;
 use std::hash::Hash;
 use std::rc::Rc;
+use z3::ast::Int;
+use z3::{Optimize, SatResult};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct Machine {
@@ -15,112 +16,18 @@ struct Lights {
     desired_powers: Rc<Vec<bool>>,
     powers: Vec<bool>,
 }
-
-impl Lights {
-    fn is_desired(&self) -> bool {
-        for (desired, power) in self.desired_powers.iter().zip(self.powers.iter()) {
-            if desired != power {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-impl Lights {
-    fn apply_wiring(&self, wiring: &Wiring) -> Lights {
-        let mut new_powers = self.powers.clone();
-        for &state in wiring.states.iter() {
-            new_powers[state] = !new_powers[state];
-        }
-
-        Lights {
-            desired_powers: self.desired_powers.clone(),
-            powers: new_powers,
-        }
-    }
-}
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Wiring {
     states: Vec<usize>,
 }
 #[derive(Debug, Hash, PartialOrd, PartialEq, Eq, Clone)]
 struct Voltages {
-    desired_values: Rc<Vec<usize>>,
-    values: Vec<usize>,
-    score: usize,
-}
-impl Ord for Voltages {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.score.cmp(&other.score)
-    }
+    desired_values: Rc<Vec<u64>>,
+    values: Vec<u64>,
+    score: u64,
 }
 
-impl Voltages {
-    pub fn score(&self) -> usize {
-        self.values.iter().sum()
-    }
-    fn is_desired(&self) -> VoltageLevel {
-        let mut not_enough = false;
-        for (desired, power) in self.desired_values.iter().zip(self.values.iter()) {
-            if desired < power {
-                return VoltageLevel::Overload;
-            } else if desired > power {
-                not_enough = true
-            }
-        }
-        if not_enough {
-            VoltageLevel::Less
-        } else {
-            VoltageLevel::Equal
-        }
-    }
-
-    fn apply_wiring(&self, wiring: &Wiring) -> Voltages {
-        let mut new_values = self.values.clone();
-        for &state in wiring.states.iter() {
-            new_values[state] += 1;
-        }
-
-        Voltages {
-            desired_values: self.desired_values.clone(),
-            score: new_values.iter().sum(),
-            values: new_values,
-        }
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-enum VoltageLevel {
-    Less,
-    Equal,
-    Overload,
-}
-
-#[derive(Debug, Hash, PartialOrd, PartialEq, Eq, Clone)]
-struct Calculation {
-    voltages: Voltages,
-    steps: u64,
-}
-
-impl Ord for Calculation {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.voltages.cmp(&other.voltages)
-    }
-}
-impl Calculation {
-    fn apply_wire(&self, wire: &Wiring) -> Calculation {
-        Calculation {
-            steps: self.steps + 1,
-            voltages: self.voltages.apply_wiring(wire),
-        }
-    }
-
-    fn score(&self) -> usize {
-        self.voltages.score()
-    }
-}
-
+// to big 23824
 fn main() {
     let file_path = "res/demo_input.txt";
     let file_path = "res/input.txt";
@@ -141,85 +48,65 @@ fn process_data(mut machines: &Vec<Machine>) -> u64 {
     machines.iter().map(|machine| check_machine(machine)).sum()
 }
 
-fn check_machine2(machine: &Machine) -> u64 {
-    let calculation = Calculation {
-        steps: 0,
-        voltages: machine.voltages.clone(),
-    };
-    let result = dfs(machine, calculation).expect("result has to exist");
-
-    println!("Machine: {:?}, needs steps: {}", machine, result);
-    result
-}
-
-fn dfs(machine: &Machine, calculation: Calculation) -> Option<u64> {
-    let mut min_calculation = None;
-    for wire in machine.wirings.iter() {
-        let new_calculation = calculation.apply_wire(&wire);
-        match new_calculation.voltages.is_desired() {
-            VoltageLevel::Less => {
-                if let Some(result) = dfs(machine, new_calculation) {
-                    if let Some(min_calculation) = &mut min_calculation {
-                        if *min_calculation > result {
-                            *min_calculation = result;
-                        }
-                    } else {
-                        min_calculation = Some(result);
-                    }
-                }
-            }
-            VoltageLevel::Equal => {
-                let result = new_calculation.steps;
-                if let Some(min_calculation) = &mut min_calculation {
-                    if *min_calculation > result {
-                        *min_calculation = result;
-                    }
-                } else {
-                    min_calculation = Some(result);
-                }
-            }
-            VoltageLevel::Overload => {
-                // println!("Machine: {:?}, overload: {:?}", machine, new_calculation);
-            }
-        }
-    }
-    min_calculation
-}
-
 fn check_machine(machine: &Machine) -> u64 {
-    let mut queue: BinaryHeap<Calculation> = BinaryHeap::new();
-    let calculation = Calculation {
-        steps: 0,
-        voltages: machine.voltages.clone(),
-    };
-    queue.push(calculation);
+    let solver = &Optimize::new();
 
-    loop {
-        let calculation = queue.pop().expect("machine has to exist at least one");
+    let variables: HashMap<usize, Int> = machine
+        .wirings
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            let variable = Int::fresh_const(format!("x_{}", i).as_str());
+            solver.assert(&variable.ge(&Int::from_u64(0)));
+            (i, variable)
+        })
+        .collect();
 
-        // println!("queue={:?}", queue);
+    machine
+        .voltages
+        .desired_values
+        .iter()
+        .enumerate()
+        .for_each(|(d_index, desired_value)| {
+            let sum = machine
+                .wirings
+                .iter()
+                .enumerate()
+                .filter(|(_, wiring)| wiring.states.contains(&d_index))
+                .map(|(w_index, _)| variables.get(&w_index).unwrap())
+                .fold(Int::from_u64(0), |acc, v| acc + v);
 
-        // println!("checking calculation = {:?}", calculation);
+            let desired_value = Int::from_u64(*desired_value);
+            solver.assert(&sum.eq(desired_value));
+        });
 
-        for wire in machine.wirings.iter() {
-            let new_calculation = calculation.apply_wire(&wire);
-            match new_calculation.voltages.is_desired() {
-                VoltageLevel::Less => {
-                    queue.push(new_calculation);
-                }
-                VoltageLevel::Equal => {
-                    println!(
-                        "Machine: {:?}, needs steps: {}",
-                        machine, new_calculation.steps
-                    );
-                    return new_calculation.steps;
-                }
-                VoltageLevel::Overload => {
-                    // println!("Machine: {:?}, overload: {:?}", machine, new_calculation);
-                }
-            }
+    let variables_sum = variables.values().fold(Int::from_u64(0), |acc, v| acc + v);
+    solver.minimize(&variables_sum);
+
+    println!("\nSolver: {:?}", solver);
+    match solver.check(&[]) {
+        SatResult::Sat => {
+            let model = solver.get_model().unwrap();
+
+            let results: HashMap<usize, u64> = variables
+                .iter()
+                .map(|(index, variable)| {
+                    let result = model.eval(variable, true).unwrap();
+                    let result = result.as_u64().unwrap();
+                    (*index, result)
+                })
+                .collect();
+            let sum = results.values().sum::<u64>();
+            println!("Sum: {sum}, Results: {:?}", results);
+
+            return sum;
+        }
+        _ => {
+            panic!("No solution for equation");
         }
     }
+
+    0
 }
 
 fn parse_lines(data: String) -> Vec<Machine> {
@@ -258,12 +145,12 @@ fn parse_lines(data: String) -> Vec<Machine> {
                 })
                 .collect();
 
-            let voltages: Vec<usize> = voltages[1..voltages.len() - 1]
+            let voltages: Vec<u64> = voltages[1..voltages.len() - 1]
                 .split(",")
                 .map(|s| s.parse().unwrap())
                 .collect();
 
-            let actual_voltages = voltages.iter().map(|_| 0).collect::<Vec<usize>>();
+            let actual_voltages = voltages.iter().map(|_| 0).collect::<Vec<u64>>();
 
             let voltages = Voltages {
                 desired_values: Rc::new(voltages),
